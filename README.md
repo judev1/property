@@ -18,7 +18,7 @@ from scraper import INSPIRE
 
 name = 'London Borough of Islington'
 authorities = INSPIRE.find()
-file = INSPIRE.download(name, authorities[name])
+filename = INSPIRE.download(name, authorities[name])
 ```
 
 Download the INSPIRE POLYGONS for all available authorities
@@ -37,8 +37,8 @@ import geopandas as gp
 from scraper import INSPIRE
 import gml
 
-file = INSPIRE.get('London Borough of Islington')
-gdf = gp.read_file(file, driver="GML")
+filename = INSPIRE.get('London Borough of Islington')
+gdf = gp.read_file(filename, driver="GML")
 gml.view(gdf, display=lambda x: gdf['INSPIREID'][x])
 ```
 

@@ -74,7 +74,7 @@ class INSPIRE(Scraper):
 
     @staticmethod
     def download(name: str, url: str) -> str:
-        """ Downloads the index polygon for the given name. """
+        """ Downloads the index polygon for the given name and returns the path to the file. """
         return asyncio.run(INSPIRE.adownload(name, url))
 
     @staticmethod
@@ -93,7 +93,7 @@ class INSPIRE(Scraper):
 
     @staticmethod
     def download_all(urls: dict = None) -> list:
-        """ Downloads all index polygons. """
+        """ Downloads all index polygons and returns a list of paths to the files. """
         return asyncio.run(INSPIRE.adownload_all(urls))
 
     @staticmethod
@@ -105,7 +105,7 @@ class INSPIRE(Scraper):
 
     @staticmethod
     def get_all() -> list:
-        """ Returns a list of paths to all index polygons. """
+        """ Returns a list of paths to all index polygon files. """
         files = list()
         for file in os.listdir('downloads/index_polygons'):
             if file.endswith('.gml'):
