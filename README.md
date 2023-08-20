@@ -84,4 +84,5 @@ Additionally, Price Paid Data contains address data processed against Ordnance S
 Royal Mail and Ordnance Survey permits use of Address Data in the Price Paid Data:
 
 > for personal and/or non-commercial use
+
 > to display for the purpose of providing residential property price information services
