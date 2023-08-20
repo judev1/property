@@ -17,8 +17,7 @@ Download INSPIRE polygons for a specific authority
 from scraper import INSPIRE
 
 name = 'London Borough of Islington'
-authorities = INSPIRE.find()
-filename = INSPIRE.download(name, authorities[name])
+filename = INSPIRE.download(name)
 ```
 
 Download the INSPIRE POLYGONS for all available authorities

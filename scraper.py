@@ -2,51 +2,58 @@ import asyncio
 import aiohttp
 import re
 import zipfile
-import time
+import random
 import os
 import io
 
 
-class Scraper:
-
-    @staticmethod
-    async def _adownload(session, url, ofile, nfile, dir, tries=1, timeout=0.1):
-        if os.path.exists(f'{dir}/{nfile}'):
-            return f'{dir}/{nfile}'
-        try:
-            async with session.get(url) as response:
-                data = await response.read()
-                operationid = str(time.time()).replace('.', '_')
-                if not os.path.exists('downloads'):
-                    os.mkdir('downloads')
-                if not os.path.exists('downloads/temp'):
-                    os.mkdir('downloads/temp')
-                os.mkdir(f'downloads/temp/{operationid}')
-                with zipfile.ZipFile(io.BytesIO(data)) as zip:
-                    zip.extractall(f'downloads/temp/{operationid}')
-                if not os.path.exists(dir):
-                    os.mkdir(dir)
-                os.rename(f'downloads/temp/{operationid}/{ofile}', f'{dir}/{nfile}')
-                for file in os.listdir(f'downloads/temp/{operationid}'):
-                    os.remove(f'downloads/temp/{operationid}/{file}')
-                os.rmdir(f'downloads/temp/{operationid}')
-                return f'{dir}/{nfile}.gml'
-        except zipfile.BadZipFile:
-            os.rmdir(f'downloads/temp/{operationid}')
-            print(f'Failed to unzip {nfile}, retrying... ({tries})')
-            await asyncio.sleep(timeout*tries)
-            return await INSPIRE._adownload(session, url, ofile, nfile, dir, tries+1)
-        except Exception as e:
-            print(f'Failed to download {nfile}, retrying... ({tries})')
-            await asyncio.sleep(timeout*tries)
-            return await INSPIRE._adownload(session, url, ofile, nfile, dir, tries+1)
-
-
-class INSPIRE(Scraper):
+class INSPIRE:
     """ A class for downloading and managing index polygons spatial data (INSPIRE).
 
         https://use-land-property-data.service.gov.uk/datasets/inspire
     """
+
+    FILE = 'Land_Registry_Cadastral_Parcels.gml'
+    URL = 'https://use-land-property-data.service.gov.uk/datasets/inspire/download/{}.zip'
+
+    @staticmethod
+    async def _adownload(session, name, tries=1, timeout=0.1):
+
+        filename = name.replace(' ', '_')
+        if os.path.exists(f'downloads/index_polygons/{filename}.gml'):
+            return f'downloads/index_polygons/{filename}.gml'
+
+        if not os.path.exists('downloads'):
+            os.mkdir('downloads')
+        if not os.path.exists('downloads/temp'):
+            os.mkdir('downloads/temp')
+        if not os.path.exists('downloads/index_polygons'):
+            os.mkdir('downloads/index_polygons')
+        operationid = str(random.random())[2:]
+        while os.path.exists(f'downloads/temp/{operationid}'):
+            operationid = str(random.random())[2:]
+        os.mkdir(f'downloads/temp/{operationid}')
+
+        try:
+            async with session.get(INSPIRE.URL.format(filename)) as response:
+                data = await response.read()
+            with zipfile.ZipFile(io.BytesIO(data)) as zip:
+                zip.extractall(f'downloads/temp/{operationid}')
+        except zipfile.BadZipFile:
+            os.rmdir(f'downloads/temp/{operationid}')
+            print(f'Failed to unzip {name}, retrying... ({tries})')
+            await asyncio.sleep(timeout*tries)
+            return await INSPIRE._adownload(session, name, tries+1)
+        except Exception as e:
+            print(f'Failed to download {name}, retrying... ({tries})')
+            await asyncio.sleep(timeout*tries)
+            return await INSPIRE._adownload(session, name, tries+1)
+
+        dir = f'downloads/temp/{operationid}'
+        os.rename(f'{dir}/{INSPIRE.FILE}', f'downloads/index_polygons/{filename}.gml')
+        os.remove(f'{dir}/INSPIRE Download Licence.pdf')
+        os.rmdir(dir)
+        return f'downloads/index_polygons/{filename}.gml'
 
     @staticmethod
     async def afind():
@@ -55,41 +62,30 @@ class INSPIRE(Scraper):
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 text = await response.text()
-                names = re.findall(r'govuk-!-width-four-fifths">\s*(.*?)\s*</', text)
-                links = re.findall(r'<a class="govuk-link"\n\s*href="(.*?)"', text)
-                return dict(zip(names, [host + link for link in links]))
+                return re.findall(r'govuk-!-width-four-fifths">\s*(.*?)\s*</', text)
 
     @staticmethod
-    def find() -> dict:
-        """ Returns a dictionary of index polygon names and their download links. """
+    def find() -> list:
+        """ Returns a list of names of all index polygons. """
         return asyncio.run(INSPIRE.afind())
 
     @staticmethod
-    async def adownload(name, url):
+    async def adownload(name):
         async with aiohttp.ClientSession() as session:
-            ofile = 'Land_Registry_Cadastral_Parcels.gml'
-            nfile = name + '.gml'
-            dir = 'downloads/index_polygons'
-            return await INSPIRE._adownload(session, url, ofile, nfile, dir)
+            return await INSPIRE._adownload(session, name)
 
     @staticmethod
-    def download(name: str, url: str) -> str:
+    def download(name: str) -> str:
         """ Downloads the index polygon for the given name and returns the path to the file. """
-        return asyncio.run(INSPIRE.adownload(name, url))
+        return asyncio.run(INSPIRE.adownload(name))
 
     @staticmethod
-    async def adownload_all(urls):
-        if urls is None:
-            urls = await INSPIRE.afind()
+    async def adownload_all(names):
+        if names is None:
+            names = await INSPIRE.afind()
         connector = aiohttp.TCPConnector(force_close=True)
         async with aiohttp.ClientSession(connector=connector) as session:
-            ofile = 'Land_Registry_Cadastral_Parcels.gml'
-            dir = 'downloads/index_polygons'
-            return await asyncio.gather(
-                *[INSPIRE._adownload(
-                    session, urls[name], ofile, name + '.gml', dir
-                ) for name in urls]
-            )
+            return await asyncio.gather(*[INSPIRE._adownload(session, name) for name in names])
 
     @staticmethod
     def download_all(urls: dict = None) -> list:
